@@ -1,101 +1,191 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
+import EmployeeCard from "../components/employee-card";
+import EmployeeForm from "../components/employee-form";
+import EmployeeStats from "../components/employee-stats";
+import { Button } from "../components/ui/button";
+import type { Employee } from "../types/employee";
+import Navbar from "../components/navbar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { useEmployees } from "../contexts/EmployeeContext";
+import { useToast } from "../components/ui/use-toast";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { employees, addEmployee, updateEmployee, deleteEmployee } =
+    useEmployees();
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const { toast } = useToast();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    console.log("Current employees:", employees); // Debug log
+    const filtered = employees.filter(
+      (employee) =>
+        employee.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        (statusFilter === "all" || employee.status === statusFilter) &&
+        (departmentFilter === "all" ||
+          employee.department === departmentFilter) &&
+        (roleFilter === "all" || employee.role === roleFilter)
+    );
+    setFilteredEmployees(filtered);
+  }, [employees, searchTerm, statusFilter, departmentFilter, roleFilter]);
+
+  const handleAddEmployee = (newEmployee: Omit<Employee, "id">) => {
+    addEmployee(newEmployee);
+    setIsFormOpen(false);
+    toast({
+      title: "Employee Added",
+      description: `${newEmployee.name} has been successfully added.`,
+    });
+  };
+
+  const handleEditEmployee = (updatedEmployee: Employee) => {
+    updateEmployee(updatedEmployee.id, updatedEmployee);
+    setEditingEmployee(null);
+    setIsFormOpen(false);
+    toast({
+      title: "Employee Updated",
+      description: `${updatedEmployee.name}'s information has been updated.`,
+    });
+  };
+
+  const handleDeleteEmployee = (id: string) => {
+    const employeeName = employees.find((e) => e.id === id)?.name;
+    deleteEmployee(id);
+    toast({
+      title: "Employee Deleted",
+      description: `${employeeName} has been removed from the system.`,
+      variant: "destructive",
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setDepartmentFilter("all");
+    setRoleFilter("all");
+  };
+
+  const departments = [...new Set(employees.map((e) => e.department))];
+  const roles = [...new Set(employees.map((e) => e.role))];
+
+  const categorizedEmployees = {
+    active: filteredEmployees.filter((e) => e.status === "active"),
+    onLeave: filteredEmployees.filter((e) => e.status === "on leave"),
+    terminated: filteredEmployees.filter((e) => e.status === "terminated"),
+  };
+
+  return (
+    <div>
+      <Navbar onSearch={setSearchTerm} />
+      <div className="container mx-auto px-4 py-8 bg-blue-100 dark:bg-gray-900">
+        <EmployeeStats employees={employees} />
+        <div className="mb-4 flex flex-wrap justify-between items-center">
+          <h1 className="text-2xl font-bold dark:text-white mb-2 sm:mb-0">
+            Employees
+          </h1>
+          <div className="flex flex-wrap gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="on leave">On Leave</SelectItem>
+                <SelectItem value="terminated">Terminated</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {roles.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {role}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={clearFilters}
+              variant="outline"
+              className="bg-blue-400 dark:bg-blue-500"
+            >
+              Clear Filters
+            </Button>
+            <Button
+              onClick={() => setIsFormOpen(true)}
+              className="bg-sky-500 dark:bg-blue-300"
+            >
+              <Plus className="mr-2 h-4 w-4 " />
+              Add Employee
+            </Button>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        {Object.entries(categorizedEmployees).map(([category, employees]) => (
+          <div key={category} className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 capitalize">
+              {category} Employees
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {employees.map((employee) => (
+                <EmployeeCard
+                  key={employee.id}
+                  employee={employee}
+                  onEdit={() => {
+                    setEditingEmployee(employee);
+                    setIsFormOpen(true);
+                  }}
+                  onDelete={() => handleDeleteEmployee(employee.id)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+        <EmployeeForm
+          employee={editingEmployee}
+          onSubmit={editingEmployee ? handleEditEmployee : handleAddEmployee}
+          onClose={() => {
+            setIsFormOpen(false);
+            setEditingEmployee(null);
+          }}
+          isOpen={isFormOpen}
+        />
+      </div>
     </div>
   );
 }
+
+
